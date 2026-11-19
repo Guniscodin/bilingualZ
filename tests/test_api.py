@@ -103,3 +103,15 @@ def test_list_and_delete(api):
     assert len(api.list_documents()) == 1
     assert api.delete_document(doc["id"])["deleted"] is True
     assert api.list_documents() == []
+
+
+def test_bridge_exposes_only_callables(api):
+    """pywebview mirrors every public attribute into the page.
+
+    A public Window/Store attribute cannot be serialised, so it spams
+    "Error while processing window.native.*" on every frame. State must stay
+    private; only methods belong on the bridge.
+    """
+    public = [name for name in dir(api) if not name.startswith("_")]
+    leaked = [name for name in public if not callable(getattr(api, name))]
+    assert leaked == []

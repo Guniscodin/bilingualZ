@@ -37,6 +37,39 @@ You need a WebView backend. On Windows that is the Edge WebView2 runtime, alread
 present on Windows 11 and almost all Windows 10 installs. On Linux install
 `webkit2gtk` (or `pywebview[qt]`); on macOS the system WebKit is used.
 
+### Trying it on Linux (no Windows reboot)
+
+The app is not Windows-only. The only Windows-specific parts are the `.exe`
+wrapper and the WebView2 runtime; the engine, the UI and the data format are
+identical everywhere. If you dual-boot and just want to *use* it:
+
+```bash
+./run-linux.sh
+```
+
+That creates `.venv-linux` with `--system-site-packages` (PyGObject and
+WebKit2GTK are distro packages, and a normal venv would hide them), installs
+the app, and opens the native window. One-time distro packages:
+
+| Distro | Command |
+| --- | --- |
+| Debian / Ubuntu | `sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1` |
+| Fedora | `sudo dnf install python3-gobject gtk3 webkit2gtk4.1` |
+| Arch | `sudo pacman -S python-gobject gtk3 webkit2gtk-4.1` |
+
+Documents written there are the same JSON files the `.exe` uses, so you can copy
+`~/.local/share/Bilingualz/` across the dual boot - or point both at a shared
+folder with `BILINGUALZ_HOME`.
+
+**Wine will not run the packaged `.exe`.** It is not a limitation you can work
+around with a flag: pywebview's Windows backend is Edge WebView2 driven through
+pythonnet, so it needs *both* .NET Framework 4.6.2+ and the WebView2 runtime
+inside the Wine prefix. The WebView2 installer refuses to run on most Wine
+versions and, where it does install, the renderer stalls or spawns runaway
+processes. Use `./run-linux.sh` instead, or a Windows VM if you specifically
+need to test the frozen build.
+
+
 ## Keys
 
 | Key | Action |
@@ -196,6 +229,7 @@ bilingualz/
 │   └── web/              # the UI (vanilla HTML/CSS/JS, no build step)
 ├── tests/                # 40 tests, no GUI required
 ├── packaging/            # PyInstaller spec, Inno Setup, build script
+├── run-linux.sh          # native Linux/macOS launcher (no reboot needed)
 └── samples/              # tiny EN/PT fixture
 ```
 

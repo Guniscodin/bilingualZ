@@ -30,21 +30,24 @@ def _title_from(text: str, fallback: str) -> str:
 
 class Api:
     def __init__(self, store: Store | None = None, translator=None):
-        self.store = store or Store()
-        self.window = None
-        # Injectable so tests never reach a real engine (and never the network).
+        # Every attribute must start with an underscore. pywebview mirrors the
+        # public ones onto window.pywebview.api, and a live Window or Store
+        # object cannot be serialised - it just floods the console with
+        # "Error while processing window.native.*" for every frame.
+        self._store = store or Store()
+        self._window = None
         self._translator = translator
 
     # -- plumbing ---------------------------------------------------------
     def set_window(self, window) -> None:
-        self.window = window
+        self._window = window
 
     def _emit(self, fraction: float, message: str) -> None:
-        if self.window is None:
+        if self._window is None:
             return
         try:
             payload = json.dumps(message)
-            self.window.evaluate_js(
+            self._window.evaluate_js(
                 f"window.BZ && window.BZ.onProgress && "
                 f"window.BZ.onProgress({float(fraction):.4f}, {payload})"
             )
@@ -65,7 +68,7 @@ class Api:
 
     # -- exposed to JS ----------------------------------------------------
     def ping(self) -> dict:
-        return {"ok": True, "version": __version__, "home": str(self.store.root)}
+        return {"ok": True, "version": __version__, "home": str(self._store.root)}
 
     def translator_info(self) -> dict:
         available = available_translators()
@@ -77,13 +80,13 @@ class Api:
         return {"name": name, "available": available}
 
     def list_documents(self) -> list[dict]:
-        return self.store.list()
+        return self._store.list()
 
     def get_document(self, doc_id: str) -> dict:
-        return self._payload(self.store.load(doc_id))
+        return self._payload(self._store.load(doc_id))
 
     def delete_document(self, doc_id: str) -> dict:
-        return {"deleted": self.store.delete(doc_id)}
+        return {"deleted": self._store.delete(doc_id)}
 
     def create_parallel(self, payload: dict) -> dict:
         en_text = payload.get("en", "")
@@ -107,7 +110,7 @@ class Api:
             progress=0,
             created_at=now(),
         )
-        self.store.save(doc)
+        self._store.save(doc)
         return self._payload(doc)
 
     def create_translated(self, payload: dict) -> dict:
@@ -139,28 +142,28 @@ class Api:
             source_lang=source,
             created_at=now(),
         )
-        self.store.save(doc)
+        self._store.save(doc)
         self._emit(1.0, "done")
         return self._payload(doc)
 
     def save_progress(self, doc_id: str, pair_index: int) -> dict:
-        doc = self.store.load(doc_id)
+        doc = self._store.load(doc_id)
         doc.progress = max(0, min(int(pair_index), max(len(doc.pairs) - 1, 0)))
-        self.store.save(doc)
+        self._store.save(doc)
         return {"progress": doc.progress}
 
     def nudge(self, doc_id: str, pair_index: int, delta: int) -> dict:
-        doc = self.store.load(doc_id)
+        doc = self._store.load(doc_id)
         index = max(0, min(int(pair_index), len(doc.pairs) - 1))
         pair = doc.pairs[index]
         doc.forced = nudge_anchors(doc.en, doc.pt, doc.forced, pair, int(delta))
         doc.pairs = align_with_anchors(doc.en, doc.pt, doc.forced)
         doc.progress = min(doc.progress, len(doc.pairs) - 1)
-        self.store.save(doc)
+        self._store.save(doc)
         return self._payload(doc)
 
     def add_anchor(self, doc_id: str, pair_index: int) -> dict:
-        doc = self.store.load(doc_id)
+        doc = self._store.load(doc_id)
         index = max(0, min(int(pair_index), len(doc.pairs) - 1))
         pair = doc.pairs[index]
         if pair.en and pair.pt:
@@ -168,15 +171,15 @@ class Api:
             if entry not in doc.forced:
                 doc.forced = sorted(doc.forced + [entry])
                 doc.pairs = align_with_anchors(doc.en, doc.pt, doc.forced)
-        self.store.save(doc)
+        self._store.save(doc)
         return self._payload(doc)
 
     def clear_anchors(self, doc_id: str) -> dict:
-        doc = self.store.load(doc_id)
+        doc = self._store.load(doc_id)
         doc.forced = []
         doc.pairs = align_with_anchors(doc.en, doc.pt)
         doc.progress = min(doc.progress, len(doc.pairs) - 1)
-        self.store.save(doc)
+        self._store.save(doc)
         return self._payload(doc)
 
 
