@@ -29,10 +29,11 @@ def _title_from(text: str, fallback: str) -> str:
 
 
 class Api:
-    def __init__(self, store: Store | None = None):
+    def __init__(self, store: Store | None = None, translator=None):
         self.store = store or Store()
         self.window = None
-        self._translator = None
+        # Injectable so tests never reach a real engine (and never the network).
+        self._translator = translator
 
     # -- plumbing ---------------------------------------------------------
     def set_window(self, window) -> None:

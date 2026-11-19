@@ -4,6 +4,7 @@ import pytest
 
 from bilingualz.api import Api
 from bilingualz.store import Store
+from bilingualz.translate import NullTranslator
 
 EN = """In 1755, an earthquake destroyed most of Lisbon.
 
@@ -18,7 +19,7 @@ O ministro do rei ordenou a reconstrucao da cidade de raiz. O seu plano produziu
 
 @pytest.fixture()
 def api(tmp_path):
-    return Api(store=Store(tmp_path))
+    return Api(store=Store(tmp_path), translator=NullTranslator())
 
 
 def test_ping(api):
@@ -75,6 +76,7 @@ def test_clear_anchors_restores_the_engine(api):
 
 
 def test_translate_mode_pairs_one_to_one(api):
+    assert api.translator_info()["name"] == "null"
     text = "Primeiro paragrafo.\n\nSegundo paragrafo.\n\nTerceiro paragrafo."
     response = api.create_translated({"text": text, "source_lang": "pt"})
     doc = response["doc"]
