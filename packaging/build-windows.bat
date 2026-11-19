@@ -10,7 +10,15 @@ if not exist ".venv" (
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 
-REM Base app. Add ".[translate]" instead if you want Argos bundled inside.
+REM --- Offline translator (slim) -------------------------------------------
+REM Argos without spaCy/stanza/torch. Those are ~1.5 GB and only used by its
+REM default sentence splitter; the app pins ARGOS_CHUNK_TYPE=MINISBD instead.
+REM Comment these four lines out for a 50-70 MB build with no offline translator.
+python -m pip install argostranslate --no-deps || goto :error
+python -m pip install "ctranslate2<5,>=4.0" "sentencepiece<0.3,>=0.2.0" "sacremoses<0.2,>=0.0.53" "minisbd>=0.9" packaging || goto :error
+python -c "import argostranslate.translate" || goto :error
+
+REM --- App ----------------------------------------------------------------
 python -m pip install -e ".[dev]" || goto :error
 
 python -m pytest -q || goto :error

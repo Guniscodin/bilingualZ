@@ -7,15 +7,27 @@ Run from the project root:
 
 Produces dist/Bilingualz/Bilingualz.exe (one folder, fast startup).
 
-If ``argostranslate`` is importable at build time it is bundled too, which makes
-offline translation work inside the frozen app. Install it first:
+Offline translation
+-------------------
+If ``argostranslate`` is importable at build time it is bundled, which makes
+translate mode work with no network and no API key. We bundle only its light
+runtime: CTranslate2 + sentencepiece + MiniSBD. spaCy, stanza and torch are
+deliberately excluded (and excluded again below), because Argos only needs them
+for its default sentence splitter - MiniSBD replaces them for ~80 MB instead of
+~1.5 GB. ``bilingualz/translate/argos.py`` pins ARGOS_CHUNK_TYPE=MINISBD.
 
-    pip install -e ".[translate]"
+Install the slim set first:
+
+    pip install argostranslate --no-deps
+    pip install "ctranslate2<5,>=4.0" "sentencepiece<0.3,>=0.2.0" \
+                "sacremoses<0.2,>=0.0.53" minisbd packaging
+    pip install -e ".[dev]"
 """
 
+import importlib
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 SPEC_DIR = Path(SPECPATH).resolve()
 PROJECT = SPEC_DIR.parent
@@ -24,35 +36,61 @@ hidden = collect_submodules("bilingualz")
 hidden += collect_submodules("webview")
 
 datas = [(str(PROJECT / "bilingualz" / "web"), "bilingualz/web")]
+binaries = []
 
-# Optional: offline translation engine.
-try:
-    import argostranslate  # noqa: F401
-    import ctranslate2  # noqa: F401
+# Native/data-carrying packages that need more than a plain import to survive
+# freezing. Each is optional so a base build still works without them.
+HEAVY = [
+    "argostranslate",
+    "ctranslate2",
+    "minisbd",
+    "sentencepiece",
+    "sacremoses",
+    "onnxruntime",
+]
 
-    hidden += collect_submodules("argostranslate")
-    hidden += collect_submodules("ctranslate2")
-    hidden += ["sentencepiece", "stanza", "sacremoses"]
-except ImportError:
-    pass
+for name in HEAVY:
+    try:
+        importlib.import_module(name)
+    except Exception:
+        continue
+    try:
+        extra_datas, extra_binaries, extra_hidden = collect_all(name)
+    except Exception:
+        continue
+    datas += extra_datas
+    binaries += extra_binaries
+    hidden += extra_hidden
 
 a = Analysis(
     [str(PROJECT / "run.py")],
     pathex=[str(PROJECT)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hidden,
     hookspath=[],
     runtime_hooks=[],
     excludes=[
+        # GUI toolkits pywebview does not use on Windows
         "tkinter",
-        "test",
-        "tests",
-        "pytest",
         "PyQt5",
         "PyQt6",
         "PySide2",
         "PySide6",
+        # Argos optional sentence splitters we intentionally do not ship
+        "spacy",
+        "thinc",
+        "blis",
+        "cymem",
+        "preshed",
+        "murmurhash",
+        "srsly",
+        "stanza",
+        "torch",
+        # dev-only
+        "test",
+        "tests",
+        "pytest",
     ],
     noarchive=False,
 )

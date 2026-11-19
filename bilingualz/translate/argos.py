@@ -12,6 +12,12 @@ import os
 
 from .base import Progress
 
+# Argos defaults to "ARGOSTRANSLATE", which prefers stanza when it is present.
+# We deliberately do not ship spacy/stanza/torch, so pin the bundled engine to
+# MiniSBD: small ONNX sentence splitter, downloaded once on first use.
+# Must be set before argostranslate.settings is imported.
+os.environ.setdefault("ARGOS_CHUNK_TYPE", "MINISBD")
+
 # Windows/Linux both accept "pt"; allow an explicit Brazilian preference.
 _PT_ALIASES = {"pt": ["pt", "pt_BR"], "pt_BR": ["pt_BR", "pt"]}
 

@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,16 +17,41 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      # Argos Translate with its light runtime only. The full dependency set
+      # pulls spaCy + stanza + torch (~1.5 GB); MiniSBD replaces all of it for
+      # sentence splitting, and the app pins ARGOS_CHUNK_TYPE=MINISBD.
+      - name: Install offline translator (slim, no torch)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install argostranslate --no-deps
+          pip install "ctranslate2<5,>=4.0" "sentencepiece<0.3,>=0.2.0" "sacremoses<0.2,>=0.0.53" "minisbd>=0.9" packaging
+
+      - name: Install app
+        run: pip install -e ".[dev]"
+
+      - name: Verify the translator imports
+        run: |
+          python -c "import ctranslate2, minisbd, sentencepiece; print('native deps ok')"
+          python -c "import argostranslate.translate, argostranslate.package; print('argostranslate ok')"
+          python -c "import os; os.environ['ARGOS_CHUNK_TYPE']='MINISBD'; import argostranslate.settings as s; print('chunk type:', s.chunk_type)"
 
       - name: Test
         run: python -m pytest -q
 
       - name: Build executable
         run: pyinstaller packaging/bilingualz.spec --noconfirm
+
+      - name: Check the executable exists
+        shell: pwsh
+        run: |
+          $exe = "dist\Bilingualz\Bilingualz.exe"
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+          $size = (Get-Item $exe).Length / 1MB
+          Write-Host ("exe: {0:N1} MB" -f $size)
+          $total = (Get-ChildItem dist\Bilingualz -Recurse | Measure-Object Length -Sum).Sum / 1MB
+          Write-Host ("dist folder: {0:N1} MB" -f $total)
 
       - name: Build installer
         run: |

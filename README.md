@@ -95,7 +95,7 @@ Engines, in order of preference:
 
 | Engine | Setup | Notes |
 | --- | --- | --- |
-| **Argos** (default) | `pip install -e ".[translate]"` | Offline, unlimited, no key. Model per direction, ~100-300 MB, fetched on first use. Fair quality. |
+| **Argos** (default) | bundled in the Windows build; `pip install -e ".[translate]"` from source | Offline, unlimited, no key. Model per direction, ~100-300 MB, fetched on first use. Fair quality. |
 | **Azure Translator F0** | `pip install -e ".[azure]"` + env vars | 2M characters/month free. Much better quality. |
 | none | - | Translate mode emits `[pt] ...` placeholders so the UI still works. |
 
@@ -138,6 +138,11 @@ On Windows:
 packaging\build-windows.bat
 ```
 
+The script installs the slim Argos runtime, so the resulting exe can translate
+offline with no key. If you would rather have a smaller build, delete the
+"offline translator" lines from the batch file and skip this step — translate
+mode then falls back to Azure or to labelled placeholders.
+
 That creates `dist\Bilingualz\Bilingualz.exe` (a folder build - fast startup).
 Add an installer with Inno Setup:
 
@@ -152,10 +157,23 @@ Two practical notes:
 
 - Build with **Python 3.12**. `pythonnet` and `ctranslate2` wheels are most
   reliable there; 3.13/3.14 support lags.
-- If you want Argos *inside* the exe, run
-  `pip install -e ".[translate]"` before `pyinstaller`. The spec detects it and
-  bundles it. Otherwise the exe stays around 40-60 MB and translate mode is
-  Azure-only.
+- The CI build ships Argos **inside** the exe, but only its light runtime:
+
+  ```bat
+  pip install argostranslate --no-deps
+  pip install "ctranslate2<5,>=4.0" "sentencepiece<0.3,>=0.2.0" ^
+              "sacremoses<0.2,>=0.0.53" "minisbd>=0.9" packaging
+  ```
+
+  Do **not** run plain `pip install argostranslate`. Its declared dependencies
+  pull spaCy, stanza and **torch** (~1.5 GB); PyInstaller would then try to
+  bundle all of it. Argos only needs them for its default sentence splitter, and
+  the app pins `ARGOS_CHUNK_TYPE=MINISBD` instead, which is ~80 MB. The spec also
+  hard-excludes `torch`, `stanza` and `spacy` so a mistake there fails loudly
+  rather than silently producing a 1.5 GB folder.
+
+  Result: roughly 200-250 MB for `dist\Bilingualz`, versus 50-70 MB without the
+  translator.
 
 ## Project layout
 
