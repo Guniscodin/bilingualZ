@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bilingualz"
+version = "0.1.0"
+description = "Side-by-side bilingual reading tool with automatic paragraph alignment"
+requires-python = ">=3.10"
+dependencies = [
+    "pywebview>=5.0",
+    "platformdirs>=4.0",
+    "pythonnet>=3.0; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+translate = ["argostranslate>=1.9"]
+azure = ["requests>=2.31"]
+dev = ["pytest>=8.0", "pyinstaller>=6.0"]
+
+[project.scripts]
+bilingualz = "bilingualz.main:main"
+
+[tool.setuptools.packages.find]
+include = ["bilingualz*"]
+
+[tool.setuptools.package-data]
+bilingualz = ["web/*.html", "web/css/*.css", "web/js/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
